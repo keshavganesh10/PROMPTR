@@ -1,0 +1,536 @@
+// ─────────────────────────────────────────────
+// Input Analyzer — Detects domain, task type,
+// complexity, and structured fields from raw user input
+// ─────────────────────────────────────────────
+
+export type Domain =
+  | 'code'
+  | 'writing'
+  | 'business'
+  | 'design'
+  | 'data'
+  | 'education'
+  | 'legal'
+  | 'marketing'
+  | 'science'
+  | 'general';
+
+export type TaskType =
+  | 'build'
+  | 'write'
+  | 'analyze'
+  | 'review'
+  | 'plan'
+  | 'debug'
+  | 'refactor'
+  | 'explain'
+  | 'design'
+  | 'research'
+  | 'general';
+
+export type Complexity = 'simple' | 'moderate' | 'complex';
+
+export interface InputAnalysis {
+  domain: Domain;
+  taskType: TaskType;
+  detectedTechnologies: string[];
+  hasAudience: boolean;
+  hasConstraints: boolean;
+  hasContext: boolean;
+  hasFormat: boolean;
+  extractedAudience: string;
+  extractedConstraints: string;
+  extractedContext: string;
+  extractedFormat: string;
+  complexity: Complexity;
+  keywords: string[];
+  pci: number; // Prompt Completeness Index (0-100)
+}
+
+// ─── Domain Detection Patterns ───
+
+interface DomainPattern {
+  domain: Domain;
+  keywords: RegExp[];
+  weight: number;
+}
+
+const DOMAIN_PATTERNS: DomainPattern[] = [
+  {
+    domain: 'code',
+    weight: 3,
+    keywords: [
+      /\b(react|next\.?js|vue|angular|svelte|node|express|django|flask|rails|spring|laravel)\b/i,
+      /\b(typescript|javascript|python|java|c\+\+|c#|rust|go|swift|kotlin|ruby|php|sql)\b/i,
+      /\b(api|rest|graphql|websocket|http|endpoint|microservice|serverless)\b/i,
+      /\b(database|mongodb|postgres|mysql|redis|firebase|supabase|prisma|orm)\b/i,
+      /\b(component|function|class|module|package|library|framework|sdk)\b/i,
+      /\b(deploy|docker|kubernetes|ci\/cd|pipeline|aws|gcp|azure|vercel|netlify)\b/i,
+      /\b(css|tailwind|sass|scss|styled-components|html|dom|responsive)\b/i,
+      /\b(git|github|gitlab|repo|repository|branch|commit|merge|pull request)\b/i,
+      /\b(test|unit test|integration test|jest|pytest|mocha|cypress|testing)\b/i,
+      /\b(debug|fix|error|bug|crash|exception|stack trace|console|log)\b/i,
+      /\b(refactor|optimise|optimize|performance|caching|lazy load|bundle)\b/i,
+      /\b(auth|authentication|authorization|oauth|jwt|session|login|signup)\b/i,
+      /\b(frontend|backend|full.?stack|web app|mobile app|desktop app|cli)\b/i,
+      /\b(algorithm|data structure|recursion|sorting|tree|graph|hash|linked list)\b/i,
+      /\b(code|coding|programming|software|developer|engineer)\b/i,
+    ],
+  },
+  {
+    domain: 'writing',
+    weight: 2,
+    keywords: [
+      /\b(blog|article|essay|post|column|editorial|op.?ed)\b/i,
+      /\b(copy|content|copywriting|content writing|ghostwrit)/i,
+      /\b(story|narrative|fiction|novel|short story|screenplay|script|dialogue)\b/i,
+      /\b(email|newsletter|announcement|press release|memo)\b/i,
+      /\b(tone|voice|style|prose|paragraph|sentence|word choice)\b/i,
+      /\b(seo|headline|hook|call to action|cta|engagement)\b/i,
+      /\b(documentation|docs|readme|guide|tutorial|how.?to)\b/i,
+      /\b(translate|translation|localise|localize|rewrite)\b/i,
+      /\b(speech|presentation|talk|keynote|ted talk)\b/i,
+    ],
+  },
+  {
+    domain: 'business',
+    weight: 2,
+    keywords: [
+      /\b(business plan|business model|revenue model|profit|loss)\b/i,
+      /\b(startup|venture|entrepreneur|founder|co.?founder)\b/i,
+      /\b(pitch|pitch deck|investor|funding|seed|series [a-c]|valuation)\b/i,
+      /\b(strategy|strategic|competitive advantage|moat|market fit|pmf)\b/i,
+      /\b(customer|user acquisition|retention|churn|ltv|cac|funnel)\b/i,
+      /\b(revenue|pricing|subscription|saas|b2b|b2c|marketplace)\b/i,
+      /\b(operations|logistics|supply chain|procurement|vendor)\b/i,
+      /\b(stakeholder|board|advisory|partnership|joint venture)\b/i,
+      /\b(okr|kpi|metric|dashboard|report|quarterly|annual)\b/i,
+      /\b(hiring|recruitment|team|culture|management|leadership)\b/i,
+    ],
+  },
+  {
+    domain: 'design',
+    weight: 2,
+    keywords: [
+      /\b(ui|ux|user interface|user experience|wireframe|mockup|prototype)\b/i,
+      /\b(figma|sketch|adobe|photoshop|illustrator|canva|invision)\b/i,
+      /\b(logo|brand|branding|identity|visual identity|style guide)\b/i,
+      /\b(colour|color|palette|typography|font|layout|grid|spacing)\b/i,
+      /\b(design system|component library|atomic design|tokens)\b/i,
+      /\b(animation|motion|transition|micro.?interaction|lottie)\b/i,
+      /\b(icon|illustration|graphic|infographic|poster|banner)\b/i,
+      /\b(accessibility|a11y|wcag|contrast|screen reader)\b/i,
+      /\b(landing page|hero|above the fold|conversion|cro)\b/i,
+    ],
+  },
+  {
+    domain: 'data',
+    weight: 2,
+    keywords: [
+      /\b(data analysis|data science|analytics|statistics|statistical)\b/i,
+      /\b(machine learning|ml|deep learning|neural network|ai model|llm)\b/i,
+      /\b(pandas|numpy|scipy|scikit|tensorflow|pytorch|keras|jupyter)\b/i,
+      /\b(dataset|dataframe|csv|json|parquet|etl|pipeline)\b/i,
+      /\b(visualization|visualisation|chart|graph|plot|dashboard|tableau|powerbi)\b/i,
+      /\b(regression|classification|clustering|prediction|forecast)\b/i,
+      /\b(sql|query|join|aggregate|group by|window function)\b/i,
+      /\b(a\/b test|experiment|hypothesis|p.?value|confidence interval)\b/i,
+      /\b(scrape|scraping|crawl|extract|parse|clean|transform)\b/i,
+    ],
+  },
+  {
+    domain: 'education',
+    weight: 2,
+    keywords: [
+      /\b(teach|lesson|curriculum|syllabus|course|workshop|seminar)\b/i,
+      /\b(student|learner|pupil|teacher|professor|instructor|tutor)\b/i,
+      /\b(homework|assignment|exam|quiz|test|assessment|rubric|grade)\b/i,
+      /\b(learning objective|outcome|pedagogy|scaffold|differentiat)\b/i,
+      /\b(lecture|module|unit|chapter|textbook|workbook)\b/i,
+      /\b(flashcard|study guide|review sheet|practice problem)\b/i,
+    ],
+  },
+  {
+    domain: 'legal',
+    weight: 3,
+    keywords: [
+      /\b(contract|agreement|clause|terms|conditions|liability)\b/i,
+      /\b(legal|law|statute|regulation|compliance|policy)\b/i,
+      /\b(intellectual property|ip|patent|trademark|copyright|nda)\b/i,
+      /\b(privacy|gdpr|ccpa|data protection|consent)\b/i,
+      /\b(dispute|arbitration|mediation|litigation|settlement)\b/i,
+      /\b(employment|termination|severance|non.?compete|non.?disclosure)\b/i,
+    ],
+  },
+  {
+    domain: 'marketing',
+    weight: 2,
+    keywords: [
+      /\b(marketing|campaign|ad|advertisement|advertising|promotion)\b/i,
+      /\b(social media|instagram|tiktok|twitter|linkedin|facebook|youtube)\b/i,
+      /\b(brand|branding|positioning|messaging|tagline|slogan)\b/i,
+      /\b(conversion|funnel|lead gen|lead generation|nurture|drip)\b/i,
+      /\b(email marketing|campaign|newsletter|subject line|open rate)\b/i,
+      /\b(seo|sem|ppc|google ads|facebook ads|paid media|organic)\b/i,
+      /\b(influencer|partnership|affiliate|referral|ambassador)\b/i,
+      /\b(product launch|go.?to.?market|gtm|launch plan|pre.?launch)\b/i,
+    ],
+  },
+  {
+    domain: 'science',
+    weight: 2,
+    keywords: [
+      /\b(research|hypothesis|experiment|methodology|peer.?review)\b/i,
+      /\b(paper|publication|journal|abstract|citation|literature review)\b/i,
+      /\b(biology|chemistry|physics|neuroscience|genomics|proteomics)\b/i,
+      /\b(clinical|trial|patient|treatment|diagnosis|therapy)\b/i,
+      /\b(lab|laboratory|protocol|assay|reagent|sample)\b/i,
+    ],
+  },
+];
+
+// ─── Task Type Detection ───
+
+interface TaskPattern {
+  taskType: TaskType;
+  patterns: RegExp[];
+}
+
+const TASK_PATTERNS: TaskPattern[] = [
+  {
+    taskType: 'build',
+    patterns: [
+      /\b(build|create|make|develop|implement|construct|set up|setup|scaffold|bootstrap|generate|produce|ship)\b/i,
+    ],
+  },
+  {
+    taskType: 'write',
+    patterns: [
+      /\b(write|draft|compose|author|craft|pen|outline|summarise|summarize|rewrite)\b/i,
+    ],
+  },
+  {
+    taskType: 'analyze',
+    patterns: [
+      /\b(analy[sz]e|evaluate|assess|examine|investigate|audit|benchmark|compare|contrast|break down)\b/i,
+    ],
+  },
+  {
+    taskType: 'review',
+    patterns: [
+      /\b(review|critique|feedback|improve|enhance|strengthen|polish|proofread|edit)\b/i,
+    ],
+  },
+  {
+    taskType: 'plan',
+    patterns: [
+      /\b(plan|strategy|strategise|strategize|roadmap|blueprint|proposal|propose|architect)\b/i,
+    ],
+  },
+  {
+    taskType: 'debug',
+    patterns: [
+      /\b(debug|fix|troubleshoot|diagnose|resolve|patch|repair|issue|error|bug)\b/i,
+    ],
+  },
+  {
+    taskType: 'refactor',
+    patterns: [
+      /\b(refactor|restructure|reorganise|reorganize|clean up|modernise|modernize|migrate|upgrade)\b/i,
+    ],
+  },
+  {
+    taskType: 'explain',
+    patterns: [
+      /\b(explain|describe|clarify|illustrate|teach|break down|walk through|demystify|how does|what is|why does)\b/i,
+    ],
+  },
+  {
+    taskType: 'design',
+    patterns: [
+      /\b(design|prototype|wireframe|mock.?up|sketch|layout|style|theme)\b/i,
+    ],
+  },
+  {
+    taskType: 'research',
+    patterns: [
+      /\b(research|find|discover|explore|survey|investigate|look into|gather|compile)\b/i,
+    ],
+  },
+];
+
+// ─── Technology Detection ───
+
+const TECH_PATTERNS: { name: string; pattern: RegExp }[] = [
+  { name: 'React', pattern: /\breact\b/i },
+  { name: 'Next.js', pattern: /\bnext\.?js\b/i },
+  { name: 'Vue', pattern: /\bvue\.?js?\b/i },
+  { name: 'Angular', pattern: /\bangular\b/i },
+  { name: 'Svelte', pattern: /\bsvelte\b/i },
+  { name: 'TypeScript', pattern: /\btypescript\b/i },
+  { name: 'JavaScript', pattern: /\bjavascript\b/i },
+  { name: 'Python', pattern: /\bpython\b/i },
+  { name: 'Java', pattern: /\bjava\b(?!\s*script)/i },
+  { name: 'C#', pattern: /\bc#\b/i },
+  { name: 'C++', pattern: /\bc\+\+\b/i },
+  { name: 'Rust', pattern: /\brust\b/i },
+  { name: 'Go', pattern: /\bgo(lang)?\b/i },
+  { name: 'Swift', pattern: /\bswift\b/i },
+  { name: 'Kotlin', pattern: /\bkotlin\b/i },
+  { name: 'Ruby', pattern: /\bruby\b/i },
+  { name: 'PHP', pattern: /\bphp\b/i },
+  { name: 'Node.js', pattern: /\bnode\.?js?\b/i },
+  { name: 'Express', pattern: /\bexpress\b/i },
+  { name: 'Django', pattern: /\bdjango\b/i },
+  { name: 'Flask', pattern: /\bflask\b/i },
+  { name: 'Rails', pattern: /\brails\b/i },
+  { name: 'Spring', pattern: /\bspring\b/i },
+  { name: 'Laravel', pattern: /\blaravel\b/i },
+  { name: 'Tailwind', pattern: /\btailwind\b/i },
+  { name: 'CSS', pattern: /\bcss\b/i },
+  { name: 'SASS', pattern: /\bsass|scss\b/i },
+  { name: 'MongoDB', pattern: /\bmongo(db)?\b/i },
+  { name: 'PostgreSQL', pattern: /\bpostgres(ql)?\b/i },
+  { name: 'MySQL', pattern: /\bmysql\b/i },
+  { name: 'Redis', pattern: /\bredis\b/i },
+  { name: 'Firebase', pattern: /\bfirebase\b/i },
+  { name: 'Supabase', pattern: /\bsupabase\b/i },
+  { name: 'Docker', pattern: /\bdocker\b/i },
+  { name: 'Kubernetes', pattern: /\bkubernetes|k8s\b/i },
+  { name: 'AWS', pattern: /\baws\b/i },
+  { name: 'GCP', pattern: /\bgcp|google cloud\b/i },
+  { name: 'Azure', pattern: /\bazure\b/i },
+  { name: 'GraphQL', pattern: /\bgraphql\b/i },
+  { name: 'REST API', pattern: /\brest\s*api\b/i },
+  { name: 'TensorFlow', pattern: /\btensorflow\b/i },
+  { name: 'PyTorch', pattern: /\bpytorch\b/i },
+  { name: 'Pandas', pattern: /\bpandas\b/i },
+];
+
+// ─── Structured Field Extraction ───
+
+function extractStructuredField(input: string, label: string): string {
+  // Match "Label: value" — grab everything until next label or end of string
+  const pattern = new RegExp(
+    `(?:^|\\n)${label}\\s*:\\s*([\\s\\S]+?)(?=\\n(?:Context|Constraints|Target Audience|Output Format)\\s*:|$)`,
+    'i'
+  );
+  const match = input.match(pattern);
+  return match ? match[1].trim() : '';
+}
+
+function stripStructuredFields(input: string): string {
+  // Remove structured field lines so the "core intent" is just the raw request
+  return input
+    .replace(/(?:^|\n)(?:Context|Constraints|Target Audience|Output Format)\s*:[\s\S]*?(?=\n(?:Context|Constraints|Target Audience|Output Format)\s*:|$)/gi, '')
+    .trim();
+}
+
+// ─── Main Analyzer ───
+
+export function analyzeInput(rawInput: string): InputAnalysis {
+  const input = rawInput.trim();
+
+  // 1. Extract structured fields
+  const extractedContext = extractStructuredField(input, 'Context');
+  const extractedConstraints = extractStructuredField(input, 'Constraints');
+  const extractedAudience = extractStructuredField(input, 'Target Audience');
+  const extractedFormat = extractStructuredField(input, 'Output Format');
+
+  // 2. Get the core intent (without structured fields)
+  const coreIntent = stripStructuredFields(input) || input;
+
+  // 3. Detect domain
+  const domainScores = new Map<Domain, number>();
+  const allKeywords: string[] = [];
+
+  for (const dp of DOMAIN_PATTERNS) {
+    let score = 0;
+    for (const kw of dp.keywords) {
+      const matches = coreIntent.match(kw);
+      if (matches) {
+        score += dp.weight;
+        allKeywords.push(matches[0]);
+      }
+    }
+    if (score > 0) {
+      domainScores.set(dp.domain, score);
+    }
+  }
+
+  let domain: Domain = 'general';
+  let maxScore = 0;
+  for (const [d, s] of domainScores) {
+    if (s > maxScore) {
+      maxScore = s;
+      domain = d;
+    }
+  }
+
+  // 4. Detect task type
+  let taskType: TaskType = 'general';
+  for (const tp of TASK_PATTERNS) {
+    for (const p of tp.patterns) {
+      if (p.test(coreIntent)) {
+        taskType = tp.taskType;
+        break;
+      }
+    }
+    if (taskType !== 'general') break;
+  }
+
+  // 5. Detect technologies
+  const detectedTechnologies: string[] = [];
+  for (const tech of TECH_PATTERNS) {
+    if (tech.pattern.test(input)) {
+      detectedTechnologies.push(tech.name);
+    }
+  }
+
+  // 6. Assess complexity
+  const words = input.split(/\s+/).length;
+  const hasMultipleRequirements = /\b(and|also|additionally|plus|as well as|furthermore|moreover)\b/i.test(input);
+  const hasMultipleSteps = /\b(then|after that|next|finally|first|second|third|step \d)\b/i.test(input);
+  const hasTechnicalDepth = detectedTechnologies.length >= 3;
+
+  let complexity: Complexity = 'simple';
+  if (words > 80 || (hasMultipleRequirements && hasMultipleSteps) || hasTechnicalDepth) {
+    complexity = 'complex';
+  } else if (words > 30 || hasMultipleRequirements || hasMultipleSteps) {
+    complexity = 'moderate';
+  }
+
+  // 7. Deduplicate keywords
+  const uniqueKeywords = [...new Set(allKeywords.map(k => k.toLowerCase()))];
+
+  // 8. Calculate Prompt Completeness Index (PCI)
+  let pci = 0;
+  // Length contribution (up to 40 points for ~50 words)
+  const wordCount = input.split(/\s+/).filter(Boolean).length;
+  pci += Math.min(40, (wordCount / 50) * 40);
+  
+  // Structure contribution (15 points each)
+  if (!!extractedAudience) pci += 15;
+  if (!!extractedConstraints) pci += 15;
+  if (!!extractedContext) pci += 15;
+  if (!!extractedFormat) pci += 15;
+  
+  // Round and cap at 100
+  pci = Math.min(100, Math.round(pci));
+
+  return {
+    domain,
+    taskType,
+    detectedTechnologies,
+    hasAudience: !!extractedAudience,
+    hasConstraints: !!extractedConstraints,
+    hasContext: !!extractedContext,
+    hasFormat: !!extractedFormat,
+    extractedAudience,
+    extractedConstraints,
+    extractedContext,
+    extractedFormat,
+    complexity,
+    keywords: uniqueKeywords,
+    pci,
+  };
+}
+
+/** Get a human-readable label for the detected domain */
+export function getDomainLabel(domain: Domain): string {
+  const labels: Record<Domain, string> = {
+    code: 'Software Engineering',
+    writing: 'Writing & Content',
+    business: 'Business & Strategy',
+    design: 'Design & UX',
+    data: 'Data & Analytics',
+    education: 'Education & Teaching',
+    legal: 'Legal & Compliance',
+    marketing: 'Marketing & Growth',
+    science: 'Science & Research',
+    general: 'General Purpose',
+  };
+  return labels[domain] || 'General Purpose';
+}
+
+export function getTaskTypeLabel(taskType: TaskType): string {
+  const labels: Record<TaskType, string> = {
+    build: 'Build/Create',
+    write: 'Writing/Drafting',
+    analyze: 'Analysis/Review',
+    review: 'Review/Feedback',
+    plan: 'Planning/Strategy',
+    debug: 'Debugging/Fixing',
+    refactor: 'Refactoring/Optimization',
+    explain: 'Explanation/Teaching',
+    design: 'Design/Architecture',
+    research: 'Research/Synthesis',
+    general: 'General Task'
+  };
+  return labels[taskType] || 'General Task';
+}
+
+// ─────────────────────────────────────────────
+// Dynamic Context Suggestions Generation
+// ─────────────────────────────────────────────
+
+export interface ContextSuggestions {
+  goal: string[];
+  audience: string[];
+  constraints: string[];
+  context: string[];
+}
+
+export function generateContextSuggestions(analysis: InputAnalysis): ContextSuggestions {
+  const domain = analysis.domain;
+  
+  // Base fallback suggestions
+  const suggestions: ContextSuggestions = {
+    goal: ['Create a first draft', 'Outline a structure', 'Generate ideas', 'Polish and refine'],
+    audience: ['General public', 'Domain experts', 'Management / Leadership', 'Beginners'],
+    constraints: ['Keep it under 500 words', 'Use simple, clear language', 'Format as bullet points', 'Adopt a professional tone'],
+    context: ['This is for a new project', 'We are updating an existing asset', 'I need this for a presentation', 'Just exploring ideas right now'],
+  };
+
+  if (domain === 'code') {
+    suggestions.goal = ['Build a functional MVP', 'Debug a specific error', 'Refactor for performance', 'Write unit tests'];
+    suggestions.audience = ['Junior Developers', 'Senior Engineers / Architects', 'Non-technical Stakeholders', 'Open Source Contributors'];
+    suggestions.constraints = ['Enforce strict type-safety', 'Optimise for time complexity (Big O)', 'Include exhaustive inline documentation', 'Adhere to SOLID principles'];
+    suggestions.context = ['Working on a legacy codebase', 'Starting a greenfield project', 'Fixing a critical production bug', 'Preparing for a code review'];
+  } else if (domain === 'writing' || domain === 'marketing') {
+    suggestions.goal = ['Write a compelling blog post', 'Draft an email newsletter', 'Create ad copy that converts', 'Write a persuasive landing page'];
+    suggestions.audience = ['Potential customers (Top of Funnel)', 'Existing subscribers', 'Industry professionals', 'Social media followers'];
+    suggestions.constraints = ['Utilise the "Show, Don\'t Tell" framework', 'Maintain a highly conversational tone', 'Use high-converting power words', 'Include a strong Call to Action (CTA)'];
+    if (domain === 'writing') {
+      suggestions.constraints.push('Write in first-person limited', 'Maintain a melancholic tone');
+    }
+    suggestions.context = ['Launching a new product next week', 'Running a holiday promotional campaign', 'Rebranding our core messaging', 'Improving SEO rankings'];
+  } else if (domain === 'business') {
+    suggestions.goal = ['Create a business strategy', 'Draft an executive summary', 'Analyze market competitors', 'Prepare a pitch deck outline'];
+    suggestions.audience = ['Investors / VCs', 'Board of Directors', 'C-Suite Executives', 'Potential partners'];
+    suggestions.constraints = ['Focus on ROI and quantifiable metrics', 'Keep it highly professional and objective', 'Limit to one page (one-pager)', 'Highlight risk mitigation strategies'];
+    suggestions.context = ['Seeking seed funding', 'Quarterly business review', 'Entering a new market', 'Evaluating a potential acquisition'];
+  } else if (domain === 'design') {
+    suggestions.goal = ['Create a UI/UX wireframe', 'Design a brand identity', 'Develop a design system', 'Critique an existing layout'];
+    suggestions.audience = ['End users / Consumers', 'Frontend developers', 'Product managers', 'Creative directors'];
+    suggestions.constraints = ['Use a minimalist, modern aesthetic', 'Ensure strict WCAG accessibility compliance', 'Follow Mobile-First responsive design', 'Adhere to existing brand guidelines'];
+    suggestions.context = ['Redesigning our core web app', 'Creating assets for a marketing push', 'Standardizing our UI components', 'Conducting user testing'];
+  } else if (domain === 'education' || domain === 'science') {
+    suggestions.goal = ['Explain a complex concept', 'Create a lesson plan', 'Summarize a research paper', 'Design an experiment'];
+    suggestions.audience = ['High school students', 'Undergraduates', 'Academic peers / Researchers', 'Curious laypeople'];
+    suggestions.constraints = ['Use relatable analogies and simple examples', 'Cite peer-reviewed sources', 'Maintain academic rigor', 'Include step-by-step methodology'];
+    suggestions.context = ['Preparing for a lecture', 'Writing a literature review', 'Designing a new curriculum', 'Applying for a research grant'];
+  }
+
+  // Inject specific technologies if detected
+  if (analysis.detectedTechnologies.length > 0) {
+    const techStr = analysis.detectedTechnologies.join(' and ');
+    if (domain === 'code') {
+      suggestions.constraints[0] = `Use best practices for ${techStr}`;
+      suggestions.context[1] = `We are heavily using ${techStr} in our stack`;
+    }
+  }
+
+  return suggestions;
+}
+

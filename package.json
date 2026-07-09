@@ -1,0 +1,185 @@
+export interface CourseModule {
+  id: string;
+  title: string;
+  description: string;
+  content: string;
+  targetWords: string[];
+}
+
+export interface QuickTip {
+  id: string;
+  title: string;
+  description: string;
+  action: string;
+}
+
+export interface Article {
+  id: string;
+  title: string;
+  author: string;
+  category: string;
+  snippet: string;
+}
+
+export const courses: CourseModule[] = [
+  {
+    id: 'first-principles',
+    title: 'First Principles',
+    description: 'Learn the foundational concepts of prompt engineering.',
+    content: `
+# First Principles
+
+Welcome to the Academy! Here, you'll learn the core concepts of effective prompt engineering.
+
+To pass this module, you need to craft a prompt that contains the following words:
+- clear
+- concise
+- context
+
+**Try writing a prompt in the Sandbox on the right that includes these words.**
+    `,
+    targetWords: ['clear', 'concise', 'context']
+  },
+  {
+    id: 'few-shot-prompting',
+    title: 'Few-Shot Prompting',
+    description: 'Learn how to provide examples to guide the model.',
+    content: `
+# Few-Shot Prompting
+
+Few-shot prompting involves giving the model a few examples of the desired output.
+
+To pass this module, use the words:
+- example
+- input
+- output
+
+Provide examples of inputs and desired outputs.
+    `,
+    targetWords: ['example', 'input', 'output']
+  },
+  {
+    id: 'chain-of-thought',
+    title: 'Chain-of-Thought Reasoning',
+    description: 'Force the model to think step-by-step for complex logic.',
+    content: `
+# Chain-of-Thought Reasoning
+
+LLMs are essentially token predictors. If you ask a complex math or logic question directly, they might guess the answer immediately and get it wrong. 
+
+By forcing the model to explain its reasoning *before* arriving at an answer, you drastically increase its accuracy.
+
+To pass this module, use the words:
+- step
+- think
+- reasoning
+    `,
+    targetWords: ['step', 'think', 'reasoning']
+  },
+  {
+    id: 'anti-sycophancy',
+    title: 'Anti-Sycophancy Protocols',
+    description: 'Get honest, brutal feedback without the AI trying to please you.',
+    content: `
+# Anti-Sycophancy Protocols
+
+LLMs are fine-tuned to be helpful and polite, which means they often agree with your bad ideas ("You're right, that's a great approach!"). 
+
+To get genuinely useful critique, you must explicitly command the AI to be ruthless.
+
+To pass this module, use the words:
+- brutal
+- critique
+- honest
+    `,
+    targetWords: ['brutal', 'critique', 'honest']
+  },
+  {
+    id: 'formatting-constraints',
+    title: 'Formatting Constraints',
+    description: 'Enforce strict JSON, Markdown, or structural output rules.',
+    content: `
+# Formatting Constraints
+
+Often you need the AI's output to be ingested by a script or API. In these cases, you cannot afford "chatty" text before or after the JSON payload.
+
+To pass this module, use the words:
+- strict
+- json
+- format
+    `,
+    targetWords: ['strict', 'json', 'format']
+  },
+  {
+    id: 'persona-adoption',
+    title: 'Persona Adoption',
+    description: 'Configure deep role-playing for specialized expertise.',
+    content: `
+# Persona Adoption
+
+An AI's default persona is a generic helpful assistant. By assigning a specific role (e.g., "Senior Rust Engineer" or "Expert Copywriter"), you bias its latent space towards more specific, high-quality knowledge.
+
+To pass this module, use the words:
+- act
+- expert
+- role
+    `,
+    targetWords: ['act', 'expert', 'role']
+  }
+];
+
+export const quickTips: QuickTip[] = [
+  {
+    id: 'act-as',
+    title: 'The "Act As" Command',
+    description: 'Always start your prompts by assigning a persona to bias the AI towards expert-level responses.',
+    action: 'Try: "Act as an elite UI designer..."',
+  },
+  {
+    id: 'temp-control',
+    title: 'Temperature Control',
+    description: 'Use a low temperature (0.2) for code and math, and a high temperature (0.8) for creative writing.',
+    action: 'Adjust sliders in the Target Model tab.',
+  },
+  {
+    id: 'xml-tags',
+    title: 'Use XML Tags',
+    description: 'Wrap different sections of your prompt in XML tags like <context> and <rules> to help the AI parse structure.',
+    action: 'Use the Promptr Intake Hub.',
+  },
+  {
+    id: 'no-yapping',
+    title: 'Stop the Yapping',
+    description: 'Add a rule: "Output ONLY the requested code. No explanations, no apologies, no conversational filler."',
+    action: 'Enable the No-Yapping cheat code.',
+  }
+];
+
+export const trendingArticles: Article[] = [
+  {
+    id: 'netflix-copy',
+    title: 'How Netflix uses Promptr for A/B testing copy',
+    author: '@growth_hacker',
+    category: 'Case Study',
+    snippet: 'Discover the exact Strategist prompt framework Netflix engineers use to generate dozens of high-converting variations...',
+  },
+  {
+    id: 'react-19',
+    title: 'Mastering the React 19 Migration Assistant',
+    author: '@react_dev',
+    category: 'Tutorial',
+    snippet: 'Learn how to use Builder mode with strict constraint injection to safely migrate thousands of components to React 19...',
+  },
+  {
+    id: 'lenz-math',
+    title: 'Teaching Calculus with Lenz Mode',
+    author: '@math_tutor',
+    category: 'Community',
+    snippet: 'A look into how educators are using the Lenz engine to guide students through complex integrations without giving the answer.',
+  }
+];
+
+export const cheatSheet = {
+  reference: "Use clear, concise language. Provide examples. Give context.",
+  commands: ["/help - get help", "/clear - clear the prompt"]
+};
